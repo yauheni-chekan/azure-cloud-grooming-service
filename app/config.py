@@ -21,6 +21,14 @@ class Settings(BaseSettings):
         default="sqlite:///:memory:",
         description="Database connection string for Azure SQL",
     )
+    unified_logs_storage_connection_string: str = Field(
+        default="",
+        description="Unified logs storage connection string",
+    )
+    unified_logs_storage_queue_name: str = Field(
+        default="grooming-service-logs",
+        description="Unified logs storage queue name",
+    )
 
     # Application Configuration
     app_name: str = Field(default="azure-cloud-grooming-service", description="Application name")

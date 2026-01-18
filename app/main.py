@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 from app.api.v1 import router as api_v1_router
 from app.config import settings
 from app.database import db
+from app.unified_log_queue import log_sender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,10 +41,28 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if "already exists" not in str(e).lower() and "duplicate" not in str(e).lower():
             logger.warning("Database table creation encountered an error, but continuing startup")
 
+    if log_sender:
+        logger.info("Sending grooming service startup log event...")
+        await log_sender.send(
+            level="info",
+            event="grooming-service.startup",
+            message="Grooming service startup complete",
+            context={
+                "database_url": settings.db_connection_string,
+            },
+        )
+
     yield  # Application runs here
 
     # Shutdown
     logger.info("Application shutdown complete")
+    if log_sender:
+        logger.info("Sending grooming service shutdown log event...")
+        await log_sender.send(
+            level="info",
+            event="grooming-service.shutdown",
+            message="Grooming service shutdown complete",
+        )
 
 
 app = FastAPI(

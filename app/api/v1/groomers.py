@@ -7,12 +7,13 @@ from fastapi import APIRouter, HTTPException, Query
 from app import crud
 from app.database import db
 from app.schemas.groomer import GroomerCreate, GroomerRead, GroomerUpdate
+from app.unified_log_queue import log_sender
 
 router = APIRouter(prefix="/groomers", tags=["groomers"])
 
 
 @router.post("", response_model=GroomerRead, status_code=201)
-def create_groomer(
+async def create_groomer(
     groomer: GroomerCreate,
 ) -> GroomerRead:
     """
@@ -28,11 +29,21 @@ def create_groomer(
         result = crud.create_groomer(session, groomer)
         session.refresh(result)
         session.expunge(result)
+        if log_sender:
+            await log_sender.send(
+                level="info",
+                event="grooming-service.groomer.created",
+                message="Groomer created",
+                context={
+                    "groomer_id": result.groomer_id,
+                    "groomer_name": f"{result.first_name} {result.last_name}",
+                },
+            )
         return result
 
 
 @router.get("/{groomer_id}", response_model=GroomerRead)
-def get_groomer(
+async def get_groomer(
     groomer_id: UUID,
 ) -> GroomerRead:
     """
@@ -56,7 +67,7 @@ def get_groomer(
 
 
 @router.put("/{groomer_id}", response_model=GroomerRead)
-def update_groomer(
+async def update_groomer(
     groomer_id: UUID,
     groomer_update: GroomerUpdate,
 ) -> GroomerRead:
@@ -78,11 +89,20 @@ def update_groomer(
         if not groomer:
             raise HTTPException(status_code=404, detail="Groomer not found")
         session.expunge(groomer)
+    if log_sender:
+        await log_sender.send(
+            level="info",
+            event="grooming-service.groomer.updated",
+            message="Groomer updated",
+            context={
+                "groomer_id": groomer_id,
+            },
+        )
     return groomer
 
 
 @router.delete("/{groomer_id}", response_model=GroomerRead)
-def delete_groomer(
+async def delete_groomer(
     groomer_id: UUID,
 ) -> GroomerRead:
     """
@@ -102,11 +122,20 @@ def delete_groomer(
         if not groomer:
             raise HTTPException(status_code=404, detail="Groomer not found")
         session.expunge(groomer)
+    if log_sender:
+        await log_sender.send(
+            level="info",
+            event="grooming-service.groomer.deleted",
+            message="Groomer deleted",
+            context={
+                "groomer_id": groomer_id,
+            },
+        )
     return groomer
 
 
 @router.get("", response_model=list[GroomerRead])
-def search_groomers(
+async def search_groomers(
     location: str | None = Query(None, description="Filter by location"),
     specialization: str | None = Query(None, description="Filter by specialization"),
     min_rating: float | None = Query(None, ge=0.0, le=5.0, description="Minimum rating filter"),

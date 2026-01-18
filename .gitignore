@@ -56,7 +56,6 @@ venv.bak/
 
 # UV
 .uv/
-uv.lock
 
 # Database
 *.db

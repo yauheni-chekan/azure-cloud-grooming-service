@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "pyodbc>=5.0.0",
     "python-dotenv>=1.0.1",
+    "azure-storage-queue>=12.15.0",
 ]
 
 [tool.ruff]
