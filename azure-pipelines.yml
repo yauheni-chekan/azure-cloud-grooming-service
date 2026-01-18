@@ -1,0 +1,112 @@
+# Azure Pipeline for Azure Cloud Grooming Service
+# Runs linting (ruff) and tests (pytest)
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - LICENSE
+      - .gitignore
+      - .dockerignore
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  PythonVersion: "3.13"
+
+stages:
+  - stage: LintAndTest
+    displayName: "Lint and Test"
+    jobs:
+      - job: Lint
+        displayName: "Run Static Analysis"
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "$(PythonVersion)"
+            displayName: "Use Python $(PythonVersion)"
+
+          - script: |
+              python -m pip install --upgrade pip
+            displayName: "Upgrade pip"
+
+          - script: |
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              export PATH="$HOME/.cargo/bin:$PATH"
+              uv --version
+            displayName: "Install uv package manager"
+
+          - script: |
+              export PATH="$HOME/.cargo/bin:$PATH"
+              uv sync --dev
+            displayName: "Install dependencies with uv"
+
+          - script: |
+              export PATH="$HOME/.cargo/bin:$PATH"
+              uv run ruff check .
+            displayName: "Run ruff check"
+
+      - job: Test
+        displayName: "Run Tests"
+        dependsOn:
+          - Lint
+        steps:
+          - script: |
+              mkdir -p junit
+            displayName: "Create junit directory"
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "$(PythonVersion)"
+            displayName: "Use Python $(PythonVersion)"
+
+          - script: |
+              python -m pip install --upgrade pip
+            displayName: "Upgrade pip"
+
+          - script: |
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              export PATH="$HOME/.cargo/bin:$PATH"
+              uv --version
+            displayName: "Install uv package manager"
+
+          - script: |
+              export PATH="$HOME/.cargo/bin:$PATH"
+              uv sync --dev
+            displayName: "Install dependencies with uv"
+
+          - script: |
+              export PATH="$HOME/.cargo/bin:$PATH"
+              uv run pytest tests/ -v \
+                --cov=app \
+                --cov-report=term-missing \
+                --cov-report=html \
+                --cov-report=xml \
+                --cov-branch \
+                --junit-xml=junit/test-results.xml
+            displayName: "Run pytest with coverage"
+
+          - task: PublishTestResults@2
+            condition: always()
+            inputs:
+              testResultsFormat: "JUnit"
+              testResultsFiles: "junit/test-results.xml"
+              failTaskOnFailedTests: true
+            displayName: "Publish test results"
+
+          - task: PublishCodeCoverageResults@2
+            condition: always()
+            inputs:
+              summaryFileLocation: "$(System.DefaultWorkingDirectory)/coverage.xml"
+              reportDirectory: "$(System.DefaultWorkingDirectory)/htmlcov"
+            displayName: "Publish code coverage results"
