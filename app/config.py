@@ -1,5 +1,7 @@
 """Configuration management using Pydantic Settings."""
 
+import os
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,14 +10,17 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env" if os.getenv("TESTING") != "1" else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
 
     # Database Configuration
-    db_connection_string: str = Field(..., description="Database connection string for Azure SQL")
+    db_connection_string: str = Field(
+        default="sqlite:///:memory:",
+        description="Database connection string for Azure SQL",
+    )
 
     # Application Configuration
     app_name: str = Field(default="azure-cloud-grooming-service", description="Application name")

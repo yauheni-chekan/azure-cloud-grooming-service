@@ -1,6 +1,11 @@
 """Pytest fixtures for testing."""
 
 import os
+
+# Set testing mode FIRST before any app imports
+# This prevents loading .env and uses default test values
+os.environ["TESTING"] = "1"
+
 from unittest.mock import patch
 
 import pytest
@@ -10,9 +15,6 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import DatabaseManager
 from app.models.base import Base
-
-# Set testing environment variable before importing app
-os.environ["TESTING"] = "1"
 
 
 @pytest.fixture(scope="function")
