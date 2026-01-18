@@ -13,6 +13,7 @@ dependencies = [
     "pyodbc>=5.0.0",
     "python-dotenv>=1.0.1",
     "azure-storage-queue>=12.15.0",
+    "prometheus-client>=0.24.1",
 ]
 
 [tool.ruff]
