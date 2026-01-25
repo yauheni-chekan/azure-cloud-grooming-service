@@ -24,6 +24,14 @@ pool:
 
 variables:
   PythonVersion: "3.13"
+  # Set these in pipeline variables or variable group; replace with your service connection and web app names
+  # AzureServiceConnection: "AZURE_SERVICE_CONNECTION"
+  # AzureWebAppName: "AZURE_WEB_APP_NAME"
+
+  DockerRegistryServiceConnection: "DockerHub-ServiceConnection"
+  ImageRepository: "eugenechekan/grooming-service"
+  ContainerRegistry: "docker.io"
+  DockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
 
 stages:
   - stage: LintAndTest
@@ -110,3 +118,37 @@ stages:
               summaryFileLocation: "$(System.DefaultWorkingDirectory)/coverage.xml"
               reportDirectory: "$(System.DefaultWorkingDirectory)/htmlcov"
             displayName: "Publish code coverage results"
+
+  - stage: BuildAndPushImage
+    displayName: "Build and Push Docker Image"
+    dependsOn: LintAndTest
+    condition: succeeded()
+    jobs:
+      - job: BuildImage
+        displayName: "Build and Push to Docker Hub"
+        steps:
+          - task: Docker@2
+            displayName: "Build and push Docker image to Docker Hub"
+            inputs:
+              command: buildAndPush
+              repository: $(ImageRepository)
+              dockerfile: $(DockerfilePath)
+              containerRegistry: $(DockerRegistryServiceConnection)
+              tags: |
+                $(Build.BuildId)
+                latest
+
+  - stage: Deploy
+    displayName: "Deploy to Azure Web App"
+    dependsOn: BuildAndPushImage
+    condition: succeeded()
+    jobs:
+      - job: DeployContainer
+        displayName: "Deploy Container to Web App"
+        steps:
+          - task: AzureWebAppContainer@1
+            displayName: "Deploy to Azure Web App for Containers"
+            inputs:
+              azureSubscription: '$(AzureServiceConnection)'
+              appName: '$(AzureWebAppName)'
+              containers: '$(ImageRepository):$(Build.BuildId)'
