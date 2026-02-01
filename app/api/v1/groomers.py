@@ -35,7 +35,7 @@ async def create_groomer(
                 event="grooming-service.groomer.created",
                 message="Groomer created",
                 context={
-                    "groomer_id": result.groomer_id,
+                    "groomer_id": f"{result.groomer_id}",
                     "groomer_name": f"{result.first_name} {result.last_name}",
                 },
             )
@@ -95,7 +95,7 @@ async def update_groomer(
             event="grooming-service.groomer.updated",
             message="Groomer updated",
             context={
-                "groomer_id": groomer_id,
+                "groomer_id": f"{groomer_id}",
             },
         )
     return groomer
@@ -128,7 +128,7 @@ async def delete_groomer(
             event="grooming-service.groomer.deleted",
             message="Groomer deleted",
             context={
-                "groomer_id": groomer_id,
+                "groomer_id": f"{groomer_id}",
             },
         )
     return groomer
@@ -191,7 +191,7 @@ async def increment_booking_count_endpoint(
             event="grooming-service.groomer.booking_count_incremented",
             message="Groomer booking count incremented",
             context={
-                "groomer_id": str(groomer_id),
+                "groomer_id": f"{groomer_id}",
                 "total_bookings_count": groomer.total_bookings_count,
             },
         )
