@@ -167,3 +167,32 @@ async def search_groomers(
         for groomer in groomers:
             session.expunge(groomer)
     return groomers
+
+
+@router.post("/{groomer_id}/increment-booking-count")
+async def increment_booking_count_endpoint(
+    groomer_id: UUID,
+) -> GroomerRead:
+    """Increment the booking count for a groomer.
+
+    This endpoint is called by the booking service when a new booking is created.
+
+    :param groomer_id: Groomer UUID
+    :return: Updated groomer with incremented booking count
+    """
+    with db.session_scope() as session:
+        groomer = crud.increment_booking_count(session, groomer_id)
+        if not groomer:
+            raise HTTPException(status_code=404, detail="Groomer not found")
+        session.expunge(groomer)
+    if log_sender:
+        await log_sender.send(
+            level="info",
+            event="grooming-service.groomer.booking_count_incremented",
+            message="Groomer booking count incremented",
+            context={
+                "groomer_id": str(groomer_id),
+                "total_bookings_count": groomer.total_bookings_count,
+            },
+        )
+    return GroomerRead.model_validate(groomer, from_attributes=True)

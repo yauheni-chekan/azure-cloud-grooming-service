@@ -151,6 +151,38 @@ def search_groomers(
     return query.order_by(Groomer.rating.desc(), Groomer.groomer_id).offset(skip).limit(limit).all()
 
 
+def recalculate_groomer_rating(db: Session, groomer_id: UUID) -> Groomer | None:
+    """
+    Recalculate a groomer's rating based on all their reviews.
+
+    This function computes the average rating from all reviews and updates
+    the groomer's rating and review_count fields.
+
+    Args:
+        db: Database session
+        groomer_id: Groomer UUID
+
+    Returns:
+        Updated groomer instance or None if groomer not found
+    """
+    groomer = get_groomer(db, groomer_id)
+    if not groomer:
+        return None
+
+    # Calculate average rating from all reviews
+    avg_rating = db.query(func.avg(Review.rating)).filter(Review.groomer_id == groomer_id).scalar()
+
+    # Update groomer rating and review count
+    groomer.rating = round(float(avg_rating), 2) if avg_rating else 0.0
+    groomer.review_count = (
+        db.query(func.count(Review.review_id)).filter(Review.groomer_id == groomer_id).scalar()
+    )
+
+    db.commit()
+    db.refresh(groomer)
+    return groomer
+
+
 def create_review(db: Session, groomer_id: UUID, review_in: ReviewCreate) -> Review | None:
     """
     Create a review for a groomer and recalculate the groomer's rating.
@@ -173,17 +205,9 @@ def create_review(db: Session, groomer_id: UUID, review_in: ReviewCreate) -> Rev
     db.flush()  # Flush to make the review visible in the same transaction
 
     # Recalculate groomer rating (including the new review)
-    avg_rating = db.query(func.avg(Review.rating)).filter(Review.groomer_id == groomer_id).scalar()
+    recalculate_groomer_rating(db, groomer_id)
 
-    groomer.rating = float(avg_rating) if avg_rating else 0.0
-    groomer.review_count = (
-        db.query(func.count(Review.review_id)).filter(Review.groomer_id == groomer_id).scalar()
-    )
-
-    db.commit()
     db.refresh(review)
-    db.refresh(groomer)
-
     return review
 
 
@@ -210,3 +234,59 @@ def get_groomer_reviews(
         .limit(limit)
         .all()
     )
+
+
+def delete_review(db: Session, review_id: UUID) -> Review | None:
+    """
+    Delete a review and recalculate the groomer's rating.
+
+    Args:
+        db: Database session
+        review_id: Review UUID
+
+    Returns:
+        Deleted review instance or None if not found
+    """
+    review = db.query(Review).filter(Review.review_id == review_id).first()
+    if not review:
+        return None
+
+    groomer_id = review.groomer_id
+
+    # Store review data before deletion
+    review_data = {
+        "review_id": review.review_id,
+        "groomer_id": review.groomer_id,
+        "booking_id": review.booking_id,
+        "user_id": review.user_id,
+        "rating": review.rating,
+        "comment": review.comment,
+        "created_at": review.created_at,
+    }
+
+    db.delete(review)
+    db.flush()
+
+    # Recalculate groomer rating after deletion
+    recalculate_groomer_rating(db, groomer_id)
+
+    # Create a detached review object to return
+    deleted_review = Review(**review_data)
+    return deleted_review
+
+
+def increment_booking_count(db: Session, groomer_id: UUID) -> Groomer | None:
+    """Increment the total_bookings_count for a groomer.
+
+    :param db: Database session
+    :param groomer_id: Groomer UUID
+    :return: Updated groomer instance or None if not found
+    """
+    groomer = get_groomer(db, groomer_id)
+    if not groomer:
+        return None
+
+    groomer.total_bookings_count += 1
+    db.commit()
+    db.refresh(groomer)
+    return groomer
